@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apex Clinical Laboratories | Laboratory Information System (LIMS)</title>
+  
+  <!-- Modern Clean Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- ChartJS CDN for Analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- jsPDF & html2canvas CDNs for PDF generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- Local Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ROOT CONTAINER -->
+  <div id="app-root">
+    
+    <!-- 1. AUTHENTICATION VIEW -->
+    <div id="view-auth" class="view-container active">
+      <div class="auth-wrapper">
+        <div class="auth-brand">
+          <div class="logo-box">
+            <img src="logo.svg" alt="Apex Labs Logo" class="auth-logo">
+          </div>
+          <h1>APEX CLINICAL LABS</h1>
+          <p>Laboratory Information Management System (LIMS)</p>
+        </div>
+        
+        <div class="auth-card">
+          <div class="auth-tabs">
+            <button class="auth-tab-btn active" id="btn-tab-login" onclick="switchAuthTab('login')">Sign In</button>
+            <button class="auth-tab-btn" id="btn-tab-register" onclick="switchAuthTab('register')">Patient Registration</button>
+          </div>
+          
+          <!-- Login Form -->
+          <form id="form-login" class="auth-form active" onsubmit="handleLogin(event)">
+            <div class="input-group">
+              <label for="login-email"><i class="fa-regular fa-envelope"></i> Email Address</label>
+              <input type="email" id="login-email" required placeholder="email@apexlabs.com">
+            </div>
+            <div class="input-group">
+              <label for="login-password"><i class="fa-solid fa-lock"></i> Password</label>
+              <input type="password" id="login-password" required placeholder="••••••••">
+            </div>
+            <div class="role-selector-wrapper">
+              <label class="label-heading"><i class="fa-solid fa-user-tag"></i> Access Role</label>
+              <div class="role-grid">
+                <label class="role-option">
+                  <input type="radio" name="login-role" value="patient" checked>
+                  <span class="role-badge"><i class="fa-solid fa-hospital-user"></i> Patient</span>
+                </label>
+                <label class="role-option">
+                  <input type="radio" name="login-role" value="technician">
+                  <span class="role-badge"><i class="fa-solid fa-microscope"></i> Tech</span>
+                </label>
+                <label class="role-option">
+                  <input type="radio" name="login-role" value="doctor">
+                  <span class="role-badge"><i class="fa-solid fa-user-doctor"></i> Doctor</span>
+                </label>
+                <label class="role-option">
+                  <input type="radio" name="login-role" value="admin">
+                  <span class="role-badge"><i class="fa-solid fa-user-shield"></i> Admin</span>
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="btn-primary auth-submit-btn">
+              <span>Access System</span> <i class="fa-solid fa-arrow-right-to-bracket"></i>
+            </button>
+            
+            <div class="demo-credentials">
+              <h4><i class="fa-solid fa-circle-info"></i> Quick Access Accounts</h4>
+              <div class="demo-badges">
+                <button type="button" class="demo-chip" onclick="autofillCreds('patient@lab.com', 'patient123', 'patient')">Patient</button>
+                <button type="button" class="demo-chip" onclick="autofillCreds('tech@lab.com', 'tech123', 'technician')">Technician</button>
+                <button type="button" class="demo-chip" onclick="autofillCreds('doctor@lab.com', 'doctor123', 'doctor')">Doctor</button>
+                <button type="button" class="demo-chip" onclick="autofillCreds('admin@lab.com', 'admin123', 'admin')">Admin</button>
+              </div>
+            </div>
+          </form>
+
+          <!-- Register Form -->
+          <form id="form-register" class="auth-form" onsubmit="handleRegister(event)">
+            <div class="input-grid">
+              <div class="input-group">
+                <label for="reg-name"><i class="fa-solid fa-signature"></i> Full Name</label>
+                <input type="text" id="reg-name" required placeholder="John Doe">
+              </div>
+              <div class="input-group">
+                <label for="reg-email"><i class="fa-regular fa-envelope"></i> Email Address</label>
+                <input type="email" id="reg-email" required placeholder="john.doe@example.com">
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="input-group">
+                <label for="reg-phone"><i class="fa-solid fa-phone"></i> Contact Number</label>
+                <input type="tel" id="reg-phone" required placeholder="9876543210">
+              </div>
+              <div class="input-group">
+                <label for="reg-dob"><i class="fa-regular fa-calendar"></i> Date of Birth</label>
+                <input type="date" id="reg-dob" required>
+              </div>
+            </div>
+            <div class="input-grid">
+              <div class="input-group">
+                <label for="reg-gender"><i class="fa-solid fa-venus-mars"></i> Gender</label>
+                <select id="reg-gender" required>
+                  <option value="" disabled selected>Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label for="reg-password"><i class="fa-solid fa-lock"></i> Password</label>
+                <input type="password" id="reg-password" required placeholder="••••••••">
+              </div>
+            </div>
+            <button type="submit" class="btn-primary auth-submit-btn">
+              <span>Register Patient</span> <i class="fa-solid fa-user-plus"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. MAIN APPLICATION LAYOUT (SIDEBAR + HEADER + DYNAMIC VIEWPORT) -->
+    <div id="view-dashboard" class="dashboard-layout">
+      
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <img src="logo.svg" alt="Apex Labs Logo" class="brand-logo">
+          <div class="brand-text">
+            <h2>APEX LABS</h2>
+            <span id="user-role-label">Patient Account</span>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <ul id="sidebar-menu-list">
+            <!-- Dynamic Menu Items -->
+          </ul>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="current-user-info">
+            <div class="avatar" id="user-avatar">P</div>
+            <div class="user-meta">
+              <h4 id="sidebar-user-name">Prakash Patel</h4>
+              <span id="sidebar-user-email">prakash@example.com</span>
+            </div>
+          </div>
+          <button class="btn-logout" onclick="handleLogout()">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i> <span>Sign Out</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- VIEWPORT PANEL -->
+      <main class="main-viewport">
+        
+        <!-- HEADER -->
+        <header class="main-header">
+          <div class="header-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="global-search" placeholder="Search directory..." oninput="handleGlobalSearch(this.value)">
+          </div>
+          
+          <div class="header-actions">
+            <!-- Theme Toggle -->
+            <button class="btn-header-action" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+              <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
+            </button>
+
+            <!-- Alerts Notification Box -->
+            <div class="notification-dropdown-wrapper">
+              <button class="btn-header-action" onclick="toggleNotifications()" title="Alerts & Notifications">
+                <i class="fa-solid fa-bell"></i>
+                <span class="badge" id="notif-count">0</span>
+              </button>
+              <div class="notifications-panel hide" id="notifications-panel">
+                <div class="notif-header">
+                  <h3>Clinical Alerts</h3>
+                  <button onclick="clearNotifications()">Clear All</button>
+                </div>
+                <ul class="notif-list" id="notification-list">
+                  <li class="empty-notif">No new updates</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Profile Info Widget -->
+            <div class="profile-header-widget">
+              <span id="header-user-role" class="header-role-badge">PATIENT</span>
+            </div>
+          </div>
+        </header>
+
+        <!-- DYNAMIC CONTENT AREA -->
+        <section class="content-scroll-container">
+          
+          <!-- VIEW 2.1: ADMIN DASHBOARD VIEWS -->
+          <div id="panel-admin" class="role-panel hide">
+            <!-- Admin Dashboard Overview Tab -->
+            <div id="subview-admin-dashboard" class="subview active">
+              <div class="view-title-section">
+                <h1>Laboratory Operations Control</h1>
+                <p>Overview of clinical activity, billing logs, and workflow statuses.</p>
+              </div>
+
+              <!-- Stats Grid -->
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <div class="stat-icon icon-revenue"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+                  <div class="stat-details">
+                    <h3>Revenue (Today)</h3>
+                    <h2 id="stat-admin-revenue">₹0.00</h2>
+                    <span class="trend up"><i class="fa-solid fa-arrow-trend-up"></i> +12% from yesterday</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon icon-patients"><i class="fa-solid fa-users"></i></div>
+                  <div class="stat-details">
+                    <h3>Active Accounts</h3>
+                    <h2 id="stat-admin-patients">0</h2>
+                    <span class="trend up"><i class="fa-solid fa-arrow-trend-up"></i> +4 registered</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon icon-samples"><i class="fa-solid fa-vial"></i></div>
+                  <div class="stat-details">
+                    <h3>Samples in Lab Queue</h3>
+                    <h2 id="stat-admin-samples">0</h2>
+                    <span class="trend down"><i class="fa-solid fa-clock"></i> Testing queue</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon icon-completed"><i class="fa-solid fa-circle-check"></i></div>
+                  <div class="stat-details">
+                    <h3>Verified Reports</h3>
+                    <h2 id="stat-admin-completed">0</h2>
+                    <span class="trend up"><i class="fa-solid fa-circle-check"></i> Certified reports</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Analytics Charts and Recent Logs -->
+              <div class="dashboard-charts-layout">
+                <div class="chart-container">
+                  <h3>Revenue & Operating Statistics</h3>
+                  <canvas id="revenueChart" height="250"></canvas>
+                </div>
+                <div class="chart-container">
+                  <h3>Specimens by Clinical Department</h3>
+                  <canvas id="categoryChart" height="250"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Admin Billing Desk Tab -->
+            <div id="subview-admin-billing" class="subview">
+              <div class="view-title-section-actions">
+                <div>
+                  <h1>Billing Desk</h1>
+                  <p>Issue patient invoices, calculate test fees, and register billing logs.</p>
+                </div>
+                <button class="btn-primary" onclick="openNewBillModal()"><i class="fa-solid fa-file-invoice-dollar"></i> Issue New Invoice</button>
+              </div>
+
+              <div class="table-container">
+                <div class="table-actions-header">
+                  <h3>Billing History</h3>
+                  <div class="pagination-controls" id="billing-pagination"></div>
+                </div>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Invoice ID</th>
+                      <th>Patient Name</th>
+                      <th>Tests Ordered</th>
+                      <th>Total Amount</th>
+                      <th>Billing Date</th>
+                      <th>Payment Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="billing-table-body">
+                    <!-- Dynamic billing list -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Admin Test Catalog Tab -->
+            <div id="subview-admin-catalog" class="subview">
+              <div class="view-title-section-actions">
+                <div>
+                  <h1>Diagnostics Test Catalog</h1>
+                  <p>Pathology test definitions, fee schedules, and biological reference intervals.</p>
+                </div>
+                <button class="btn-primary" onclick="openAddCatalogModal()"><i class="fa-solid fa-circle-plus"></i> Define Pathology Profile</button>
+              </div>
+
+              <div class="catalog-grid" id="catalog-grid-container">
+                <!-- Dynamic Catalogs -->
+              </div>
+            </div>
+
+            <!-- Admin User Management Tab -->
+            <div id="subview-admin-users" class="subview">
+              <div class="view-title-section-actions">
+                <div>
+                  <h1>Clinical Role Registry</h1>
+                  <p>Register and manage system roles (Patients, Technicians, Doctors).</p>
+                </div>
+                <button class="btn-primary" onclick="openAddUserModal()"><i class="fa-solid fa-user-plus"></i> Register User Account</button>
+              </div>
+
+              <div class="table-container">
+                <div class="table-actions-header">
+                  <h3>Clinical User Directory</h3>
+                  <div class="pagination-controls" id="users-pagination"></div>
+                </div>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>User ID</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Contact No</th>
+                      <th>System Role</th>
+                      <th>Join Date</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="users-table-body">
+                    <!-- Dynamic users list -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- VIEW 2.2: LAB TECHNICIAN DASHBOARD VIEWS -->
+          <div id="panel-technician" class="role-panel hide">
+            <div id="subview-tech-samples" class="subview active">
+              <div class="view-title-section">
+                <h1>Specimen Accessioning & Queue</h1>
+                <p>Update specimen lifecycle stages and log observed results.</p>
+              </div>
+
+              <div class="table-container">
+                <div class="table-actions-header">
+                  <h3>Active Test Samples</h3>
+                  <div class="pagination-controls" id="samples-pagination"></div>
+                </div>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Order ID</th>
+                      <th>Patient Name</th>
+                      <th>Test Profile</th>
+                      <th>Collection Date</th>
+                      <th>Current Stage</th>
+                      <th>Observation Parameters</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="samples-table-body">
+                    <!-- Dynamic samples list -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- VIEW 2.3: DOCTOR PORTAL VIEWS -->
+          <div id="panel-doctor" class="role-panel hide">
+            <div id="subview-doctor-records" class="subview active">
+              <div class="view-title-section">
+                <h1>Patient Directory & Records</h1>
+                <p>Review diagnostic charts and record clinical pathologist remarks.</p>
+              </div>
+
+              <div class="table-container">
+                <div class="table-actions-header">
+                  <h3>Patient Medical Records</h3>
+                  <div class="pagination-controls" id="doctor-patients-pagination"></div>
+                </div>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Patient ID</th>
+                      <th>Name</th>
+                      <th>Gender / Age</th>
+                      <th>Active Specimens</th>
+                      <th>Certified Reports</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="doctor-patients-table-body">
+                    <!-- Dynamic doctor patients list -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- VIEW 2.4: PATIENT PORTAL VIEWS -->
+          <div id="panel-patient" class="role-panel hide">
+            <!-- Patient Dashboard Tab -->
+            <div id="subview-patient-dashboard" class="subview active">
+              <div class="view-title-section">
+                <h1>Patient Health Portal</h1>
+                <p>View test schedules, active specimens, and certified pathology reports.</p>
+              </div>
+
+              <!-- Patient Stats Overview -->
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <div class="stat-icon icon-patients"><i class="fa-solid fa-heart-pulse"></i></div>
+                  <div class="stat-details">
+                    <h3>Age / Gender</h3>
+                    <h2 id="stat-patient-age">0 yrs</h2>
+                    <span id="stat-patient-gender" class="trend neutral">Male</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon icon-revenue"><i class="fa-solid fa-receipt"></i></div>
+                  <div class="stat-details">
+                    <h3>Total Invoices</h3>
+                    <h2 id="stat-patient-orders">0</h2>
+                    <span class="trend up"><i class="fa-solid fa-file-invoice"></i> Registered Billing</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon icon-samples"><i class="fa-solid fa-spinner"></i></div>
+                  <div class="stat-details">
+                    <h3>Active Specimens</h3>
+                    <h2 id="stat-patient-processing">0</h2>
+                    <span class="trend down"><i class="fa-solid fa-hourglass-half"></i> Under testing</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon icon-completed"><i class="fa-solid fa-file-pdf"></i></div>
+                  <div class="stat-details">
+                    <h3>Certified Reports</h3>
+                    <h2 id="stat-patient-completed">0</h2>
+                    <span class="trend up"><i class="fa-solid fa-circle-check"></i> Ready to download</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Patient Health Charts and Details -->
+              <div class="dashboard-charts-layout">
+                <div class="chart-container font-style-cards">
+                  <h3>Recent Medical Results</h3>
+                  <div class="health-trend-visual">
+                    <div class="health-card-metric">
+                      <div class="metric-header">
+                        <span><i class="fa-solid fa-droplet"></i> Hemoglobin Level</span>
+                        <span class="metric-val" id="health-val-hb">-</span>
+                      </div>
+                      <div class="progress-bar-bg"><div class="progress-fill" id="health-progress-hb" style="width: 0%"></div></div>
+                    </div>
+                    <div class="health-card-metric">
+                      <div class="metric-header">
+                        <span><i class="fa-solid fa-heart"></i> Total Cholesterol</span>
+                        <span class="metric-val" id="health-val-chol">-</span>
+                      </div>
+                      <div class="progress-bar-bg"><div class="progress-fill" id="health-progress-chol" style="width: 0%"></div></div>
+                    </div>
+                    <div class="health-card-metric">
+                      <div class="metric-header">
+                        <span><i class="fa-solid fa-dna"></i> Fasting Blood Sugar</span>
+                        <span class="metric-val" id="health-val-sugar">-</span>
+                      </div>
+                      <div class="progress-bar-bg"><div class="progress-fill" id="health-progress-sugar" style="width: 0%"></div></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="chart-container font-style-cards scrollable-notes">
+                  <h3>Physician Clinical Guidance</h3>
+                  <ul class="doctor-notes-list" id="patient-notes-list">
+                    <li class="empty-list">No clinical notes or active path remarks recorded by your doctor.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- Patient Reports Tab -->
+            <div id="subview-patient-reports" class="subview">
+              <div class="view-title-section">
+                <h1>Report History & Downloads</h1>
+                <p>View specimen statuses and download certified laboratory reports.</p>
+              </div>
+
+              <div class="table-container">
+                <div class="table-actions-header">
+                  <h3>Laboratory Diagnostics Archive</h3>
+                  <div class="pagination-controls" id="patient-reports-pagination"></div>
+                </div>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Order ID</th>
+                      <th>Test Profile</th>
+                      <th>Billed Cost</th>
+                      <th>Billing Date</th>
+                      <th>Processing State</th>
+                      <th>Physician Notes</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="patient-reports-table-body">
+                    <!-- Dynamic patient reports -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </section>
+      </main>
+
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL WINDOWS FOR CRUD AND FORMS -->
+  <!-- ============================================== -->
+
+  <!-- 1. NEW BILL MODAL -->
+  <div class="modal-backdrop hide" id="modal-new-bill">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Issue New Diagnostic Invoice</h2>
+        <button class="btn-close-modal" onclick="closeNewBillModal()">&times;</button>
+      </div>
+      <form id="form-new-bill" onsubmit="handleCreateBill(event)">
+        <div class="input-group">
+          <label for="bill-patient-select">Patient</label>
+          <select id="bill-patient-select" required>
+            <!-- Dynamic patients -->
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Select Pathology Profiles</label>
+          <div class="checkbox-catalog-list" id="bill-catalog-checklist">
+            <!-- Dynamic catalog checkboxes -->
+          </div>
+        </div>
+        <div class="invoice-summary-box">
+          <div class="summary-line">
+            <span>Subtotal:</span>
+            <span id="bill-summary-subtotal">₹0.00</span>
+          </div>
+          <div class="summary-line">
+            <span>Auto loyalty discount (10%):</span>
+            <span id="bill-summary-discount">-₹0.00</span>
+          </div>
+          <hr>
+          <div class="summary-line grand-total">
+            <span>Total Payable:</span>
+            <span id="bill-summary-total">₹0.00</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeNewBillModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Generate Invoice</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. ADD CATALOG MODAL -->
+  <div class="modal-backdrop hide" id="modal-catalog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="catalog-modal-title">Create Pathology Test Definition</h2>
+        <button class="btn-close-modal" onclick="closeCatalogModal()">&times;</button>
+      </div>
+      <form id="form-catalog" onsubmit="handleSaveCatalog(event)">
+        <input type="hidden" id="catalog-id">
+        <div class="input-group">
+          <label for="catalog-name">Pathology Test Name</label>
+          <input type="text" id="catalog-name" required placeholder="e.g. Complete Blood Count (CBC)">
+        </div>
+        <div class="input-grid">
+          <div class="input-group">
+            <label for="catalog-code">Test Code</label>
+            <input type="text" id="catalog-code" required placeholder="e.g. CBC">
+          </div>
+          <div class="input-group">
+            <label for="catalog-dept">Clinical Department</label>
+            <input type="text" id="catalog-dept" required placeholder="e.g. Hematology">
+          </div>
+        </div>
+        <div class="input-grid">
+          <div class="input-group">
+            <label for="catalog-price">Price (₹)</label>
+            <input type="number" id="catalog-price" min="0" required placeholder="e.g. 500">
+          </div>
+          <div class="input-group">
+            <label for="catalog-time">Est. Processing Hours</label>
+            <input type="number" id="catalog-time" min="1" required placeholder="e.g. 24">
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="catalog-desc">Description</label>
+          <textarea id="catalog-desc" rows="2" placeholder="Describe the diagnostic purpose..." required></textarea>
+        </div>
+        
+        <div class="catalog-parameters-section">
+          <h3>Parameters & Reference Bounds</h3>
+          <div id="catalog-params-list">
+            <!-- Dynamic parameters -->
+          </div>
+          <button type="button" class="btn-secondary btn-sm" onclick="addParameterRow()"><i class="fa-solid fa-plus"></i> Add Parameter</button>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeCatalogModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Save Test Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. ADD USER MODAL -->
+  <div class="modal-backdrop hide" id="modal-user">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="user-modal-title">Register User Account</h2>
+        <button class="btn-close-modal" onclick="closeUserModal()">&times;</button>
+      </div>
+      <form id="form-user" onsubmit="handleSaveUser(event)">
+        <input type="hidden" id="user-id">
+        <div class="input-group">
+          <label for="user-name">Full Name</label>
+          <input type="text" id="user-name" required placeholder="e.g. Jane Smith">
+        </div>
+        <div class="input-grid">
+          <div class="input-group">
+            <label for="user-email">Email Address</label>
+            <input type="email" id="user-email" required placeholder="jane@lab.com">
+          </div>
+          <div class="input-group">
+            <label for="user-role">System Role</label>
+            <select id="user-role" required>
+              <option value="patient">Patient</option>
+              <option value="technician">Lab Technician</option>
+              <option value="doctor">Doctor</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-grid">
+          <div class="input-group">
+            <label for="user-phone">Contact Number</label>
+            <input type="tel" id="user-phone" required placeholder="9876543210">
+          </div>
+          <div class="input-group">
+            <label for="user-password">Account Password</label>
+            <input type="password" id="user-password" required placeholder="••••••••">
+          </div>
+        </div>
+        <div class="input-grid">
+          <div class="input-group">
+            <label for="user-dob">Date of Birth</label>
+            <input type="date" id="user-dob" required>
+          </div>
+          <div class="input-group">
+            <label for="user-gender">Gender</label>
+            <select id="user-gender" required>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeUserModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Save User Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. TECHNICIAN METRIC FORM MODAL -->
+  <div class="modal-backdrop hide" id="modal-tech-metrics">
+    <div class="modal-content large-modal">
+      <div class="modal-header">
+        <h2>Record Observation Metrics</h2>
+        <button class="btn-close-modal" onclick="closeTechMetricsModal()">&times;</button>
+      </div>
+      <form id="form-tech-metrics" onsubmit="handleSaveMetrics(event)">
+        <input type="hidden" id="metrics-order-id">
+        
+        <div class="patient-summary-banner">
+          <div><strong>Patient:</strong> <span id="metrics-patient-name">-</span></div>
+          <div><strong>Test:</strong> <span id="metrics-test-name">-</span></div>
+          <div><strong>Invoice ID:</strong> <span id="metrics-invoice-id">-</span></div>
+        </div>
+
+        <div class="metrics-grid-inputs" id="metrics-inputs-container">
+          <!-- Dynamic parameter inputs will go here -->
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeTechMetricsModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Certify & Save Results</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5. DOCTOR ALERT NOTES MODAL -->
+  <div class="modal-backdrop hide" id="modal-doctor-notes">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Clinical Pathologist Comments</h2>
+        <button class="btn-close-modal" onclick="closeDoctorNotesModal()">&times;</button>
+      </div>
+      <form id="form-doctor-notes" onsubmit="handleSaveDoctorNotes(event)">
+        <input type="hidden" id="doctor-notes-order-id">
+        <div class="patient-summary-banner">
+          <div><strong>Patient:</strong> <span id="doc-notes-patient-name">-</span></div>
+          <div><strong>Test Profile:</strong> <span id="doc-notes-test-name">-</span></div>
+        </div>
+        
+        <div class="input-group">
+          <label for="doctor-severity">Priority Level</label>
+          <select id="doctor-severity" required>
+            <option value="Normal">Normal (Routine Result)</option>
+            <option value="Medium">Medium (Attention Advised)</option>
+            <option value="Urgent">Urgent (Action Required)</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="doctor-notes-text">Physician Diagnostic Notes</label>
+          <textarea id="doctor-notes-text" rows="4" placeholder="Enter clinical remarks or instructions..." required></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeDoctorNotesModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Attach Comments</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 6. DYNAMIC HIDDEN ELEMENT FOR PDF RENDERING -->
+  <div id="pdf-rendering-temp" style="position: absolute; left: -9999px; top: -9999px;">
+    <!-- Rendered dynamically for high fidelity A4 prints -->
+  </div>
+
+  <!-- Main JavaScript File -->
+  <script src="app.js"></script>
+</body>
+</html>
