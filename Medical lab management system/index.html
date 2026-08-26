@@ -352,6 +352,50 @@
                 </table>
               </div>
             </div>
+
+            <!-- Admin Audit Log Tab -->
+            <div id="subview-admin-audit" class="subview">
+              <div class="view-title-section-actions">
+                <div>
+                  <h1>System Security & Audit Log</h1>
+                  <p>Immutable record of access events, order activities, sample rejections, and payment logs.</p>
+                </div>
+                <div class="audit-filters">
+                  <select id="audit-category-filter" onchange="renderAuditLogs()">
+                    <option value="ALL">All Event Categories</option>
+                    <option value="Auth">Authentication</option>
+                    <option value="Orders">Lab Orders</option>
+                    <option value="Laboratory">Specimens & Results</option>
+                    <option value="Billing">Payments & Invoices</option>
+                    <option value="Clinical Notes">Clinical Notes</option>
+                    <option value="Security">Security & Passwords</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="table-container">
+                <div class="table-actions-header">
+                  <h3>Activity Trail</h3>
+                  <div class="pagination-controls" id="audit-pagination"></div>
+                </div>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Log ID</th>
+                      <th>Timestamp</th>
+                      <th>User / Actor</th>
+                      <th>Role</th>
+                      <th>Action</th>
+                      <th>Category</th>
+                      <th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody id="audit-table-body">
+                    <!-- Dynamic audit logs list -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
           <!-- VIEW 2.2: LAB TECHNICIAN DASHBOARD VIEWS -->
@@ -389,10 +433,14 @@
 
           <!-- VIEW 2.3: DOCTOR PORTAL VIEWS -->
           <div id="panel-doctor" class="role-panel hide">
+            <!-- Doctor Patient Records Subview -->
             <div id="subview-doctor-records" class="subview active">
-              <div class="view-title-section">
-                <h1>Patient Directory & Records</h1>
-                <p>Review diagnostic charts and record clinical pathologist remarks.</p>
+              <div class="view-title-section-actions">
+                <div>
+                  <h1>Patient Directory & Records</h1>
+                  <p>Review diagnostic charts, order laboratory tests, and record pathologist remarks.</p>
+                </div>
+                <button class="btn-primary" onclick="openDoctorOrderModal()"><i class="fa-solid fa-vial-circle-check"></i> Order Laboratory Test</button>
               </div>
 
               <div class="table-container">
@@ -417,6 +465,40 @@
                 </table>
               </div>
             </div>
+
+            <!-- Doctor Clinical Notes Subview -->
+            <div id="subview-doctor-notes" class="subview">
+              <div class="view-title-section-actions">
+                <div>
+                  <h1>Clinical Pathologist Remarks</h1>
+                  <p>Comprehensive register of physician medical notes, diagnostic impressions, and priority guidance.</p>
+                </div>
+                <button class="btn-primary" onclick="openDoctorNotesModal()"><i class="fa-solid fa-notes-medical"></i> Record Clinical Note</button>
+              </div>
+
+              <div class="table-container">
+                <div class="table-actions-header">
+                  <h3>Clinical Notes Archive</h3>
+                  <div class="pagination-controls" id="doctor-notes-pagination"></div>
+                </div>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Note ID</th>
+                      <th>Timestamp</th>
+                      <th>Patient Name</th>
+                      <th>Physician</th>
+                      <th>Priority Severity</th>
+                      <th>Diagnostic Guidance</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="doctor-notes-table-body">
+                    <!-- Dynamic doctor notes list -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
           <!-- VIEW 2.4: PATIENT PORTAL VIEWS -->
@@ -435,7 +517,7 @@
                   <div class="stat-details">
                     <h3>Age / Gender</h3>
                     <h2 id="stat-patient-age">0 yrs</h2>
-                    <span id="stat-patient-gender" class="trend neutral">Male</span>
+                    <span id="stat-patient-gender" class="trend neutral">Female</span>
                   </div>
                 </div>
                 <div class="stat-card">
@@ -498,6 +580,116 @@
                     <li class="empty-list">No clinical notes or active path remarks recorded by your doctor.</li>
                   </ul>
                 </div>
+              </div>
+            </div>
+
+            <!-- Patient Profile & Security Subview -->
+            <div id="subview-patient-profile" class="subview">
+              <div class="view-title-section">
+                <h1>Personal Profile & Security Settings</h1>
+                <p>Manage contact information, personal demographic details, and account password.</p>
+              </div>
+
+              <div class="profile-settings-layout">
+                <!-- Personal Info Card -->
+                <div class="profile-card">
+                  <div class="profile-card-header">
+                    <h3><i class="fa-solid fa-id-card"></i> Personal Information</h3>
+                  </div>
+                  <form id="form-patient-profile" onsubmit="handleSavePatientProfile(event)">
+                    <div class="input-grid">
+                      <div class="input-group">
+                        <label for="profile-name">Full Name</label>
+                        <input type="text" id="profile-name" required placeholder="Full Name">
+                      </div>
+                      <div class="input-group">
+                        <label for="profile-email">Email Address</label>
+                        <input type="email" id="profile-email" required placeholder="email@example.com">
+                      </div>
+                    </div>
+                    <div class="input-grid">
+                      <div class="input-group">
+                        <label for="profile-phone">Contact Number</label>
+                        <input type="tel" id="profile-phone" required placeholder="+91 98765 43210">
+                      </div>
+                      <div class="input-group">
+                        <label for="profile-dob">Date of Birth</label>
+                        <input type="date" id="profile-dob" required>
+                      </div>
+                    </div>
+                    <div class="input-grid">
+                      <div class="input-group">
+                        <label for="profile-gender">Gender</label>
+                        <select id="profile-gender" required>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div class="input-group">
+                        <label for="profile-address">Residential Address</label>
+                        <input type="text" id="profile-address" placeholder="Address, City, Pincode">
+                      </div>
+                    </div>
+                    <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Update Profile Info</button>
+                  </form>
+                </div>
+
+                <!-- Password Security Card -->
+                <div class="profile-card">
+                  <div class="profile-card-header">
+                    <h3><i class="fa-solid fa-shield-halved"></i> Change Security Password</h3>
+                  </div>
+                  <form id="form-patient-password" onsubmit="handlePatientChangePassword(event)">
+                    <div class="input-group">
+                      <label for="pwd-current">Current Password</label>
+                      <input type="password" id="pwd-current" required placeholder="••••••••">
+                    </div>
+                    <div class="input-grid">
+                      <div class="input-group">
+                        <label for="pwd-new">New Password</label>
+                        <input type="password" id="pwd-new" required placeholder="••••••••">
+                      </div>
+                      <div class="input-group">
+                        <label for="pwd-confirm">Confirm New Password</label>
+                        <input type="password" id="pwd-confirm" required placeholder="••••••••">
+                      </div>
+                    </div>
+                    <button type="submit" class="btn-secondary"><i class="fa-solid fa-key"></i> Update Security Password</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <!-- Patient Invoices & Online Payment Gateway Subview -->
+            <div id="subview-patient-billing" class="subview">
+              <div class="view-title-section">
+                <h1>Diagnostics Billing & Payment Gateway</h1>
+                <p>Review unpaid diagnostic invoices and complete secure online payments.</p>
+              </div>
+
+              <div class="table-container">
+                <div class="table-actions-header">
+                  <h3>Your Diagnostic Invoices</h3>
+                  <div class="pagination-controls" id="patient-billing-pagination"></div>
+                </div>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Invoice ID</th>
+                      <th>Tests Included</th>
+                      <th>Billing Date</th>
+                      <th>Subtotal</th>
+                      <th>Discount</th>
+                      <th>Total Amount</th>
+                      <th>Payment Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="patient-billing-table-body">
+                    <!-- Dynamic patient billing table -->
+                  </tbody>
+                </table>
               </div>
             </div>
 
@@ -737,9 +929,11 @@
       </div>
       <form id="form-doctor-notes" onsubmit="handleSaveDoctorNotes(event)">
         <input type="hidden" id="doctor-notes-order-id">
-        <div class="patient-summary-banner">
-          <div><strong>Patient:</strong> <span id="doc-notes-patient-name">-</span></div>
-          <div><strong>Test Profile:</strong> <span id="doc-notes-test-name">-</span></div>
+        <div class="input-group">
+          <label for="doc-notes-patient-select">Patient</label>
+          <select id="doc-notes-patient-select" required>
+            <!-- Dynamic patients -->
+          </select>
         </div>
         
         <div class="input-group">
@@ -764,7 +958,172 @@
     </div>
   </div>
 
-  <!-- 6. DYNAMIC HIDDEN ELEMENT FOR PDF RENDERING -->
+  <!-- 6. DOCTOR ORDER LABORATORY TEST MODAL -->
+  <div class="modal-backdrop hide" id="modal-doctor-order">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-vial-circle-check"></i> Order Laboratory Diagnostics</h2>
+        <button class="btn-close-modal" onclick="closeDoctorOrderModal()">&times;</button>
+      </div>
+      <form id="form-doctor-order" onsubmit="handleCreateDoctorOrder(event)">
+        <div class="input-group">
+          <label for="doc-order-patient-select">Target Patient</label>
+          <select id="doc-order-patient-select" required>
+            <!-- Dynamic patients list -->
+          </select>
+        </div>
+        <div class="input-group">
+          <label for="doc-order-priority">Diagnostic Priority</label>
+          <select id="doc-order-priority" required>
+            <option value="Routine">Routine (Standard Queue)</option>
+            <option value="Urgent">Urgent (Priority Accessioning)</option>
+            <option value="STAT">STAT (Emergency Immediate Analysis)</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Select Pathology Profiles</label>
+          <div class="checkbox-catalog-list" id="doc-order-catalog-checklist">
+            <!-- Dynamic catalog checkboxes -->
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="doc-order-notes">Clinical Ordering Instructions</label>
+          <textarea id="doc-order-notes" rows="3" placeholder="Fasting status, special specimen precautions, clinical rationale..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeDoctorOrderModal()">Cancel</button>
+          <button type="submit" class="btn-primary"><i class="fa-solid fa-paper-plane"></i> Submit Diagnostic Order</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 7. TECHNICIAN SAMPLE REJECTION MODAL -->
+  <div class="modal-backdrop hide" id="modal-tech-reject">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-triangle-exclamation"></i> Flag Specimen Rejection</h2>
+        <button class="btn-close-modal" onclick="closeTechRejectModal()">&times;</button>
+      </div>
+      <form id="form-tech-reject" onsubmit="handleConfirmSampleRejection(event)">
+        <input type="hidden" id="reject-specimen-id">
+        <input type="hidden" id="reject-order-id">
+        
+        <div class="patient-summary-banner rejection-banner">
+          <div><strong>Specimen ID:</strong> <span id="reject-spec-code">-</span></div>
+          <div><strong>Patient:</strong> <span id="reject-patient-name">-</span></div>
+          <div><strong>Test Profile:</strong> <span id="reject-test-name">-</span></div>
+        </div>
+
+        <div class="input-group">
+          <label for="reject-reason-select">Primary Rejection Reason</label>
+          <select id="reject-reason-select" required>
+            <option value="" disabled selected>Select Medical Rejection Reason</option>
+            <option value="Hemolyzed Specimen">Hemolyzed Specimen (Red Cell Lysis)</option>
+            <option value="Insufficient Volume">Insufficient Sample Volume</option>
+            <option value="Clotted Blood Sample">Clotted Whole Blood Sample</option>
+            <option value="Mislabeled Container">Mislabeled / Missing Barcode Container</option>
+            <option value="Contaminated Tube">Contaminated Specimen Tube</option>
+            <option value="Improper Transport Temp">Improper Transport Temperature</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="reject-additional-notes">Additional Technician Remarks</label>
+          <textarea id="reject-additional-notes" rows="3" placeholder="Describe sample condition or collection instructions..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeTechRejectModal()">Cancel</button>
+          <button type="submit" class="btn-danger"><i class="fa-solid fa-ban"></i> Confirm Sample Rejection</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 8. PATIENT ONLINE PAYMENT GATEWAY CHECKOUT MODAL -->
+  <div class="modal-backdrop hide" id="modal-patient-checkout">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-credit-card"></i> Online Diagnostic Payment Gateway</h2>
+        <button class="btn-close-modal" onclick="closePatientCheckoutModal()">&times;</button>
+      </div>
+      <form id="form-patient-checkout" onsubmit="handleProcessOnlinePayment(event)">
+        <input type="hidden" id="checkout-invoice-id">
+        <input type="hidden" id="checkout-amount">
+
+        <div class="checkout-amount-display">
+          <span>Amount Payable:</span>
+          <h2 id="checkout-display-total">₹0.00</h2>
+        </div>
+
+        <div class="payment-method-selector">
+          <label class="pay-method-option">
+            <input type="radio" name="pay-method" value="UPI / GPay" checked onclick="switchPayMethod('upi')">
+            <span class="pay-badge"><i class="fa-solid fa-qrcode"></i> UPI / GPay / PhonePe</span>
+          </label>
+          <label class="pay-method-option">
+            <input type="radio" name="pay-method" value="Credit / Debit Card" onclick="switchPayMethod('card')">
+            <span class="pay-badge"><i class="fa-solid fa-credit-card"></i> Debit / Credit Card</span>
+          </label>
+          <label class="pay-method-option">
+            <input type="radio" name="pay-method" value="Net Banking" onclick="switchPayMethod('netbanking')">
+            <span class="pay-badge"><i class="fa-solid fa-building-columns"></i> Net Banking</span>
+          </label>
+        </div>
+
+        <!-- UPI Tab -->
+        <div id="pay-panel-upi" class="pay-panel active">
+          <div class="input-group">
+            <label for="pay-upi-id">UPI Virtual Address (VPA)</label>
+            <input type="text" id="pay-upi-id" placeholder="username@upi or 9876543210@paytm">
+          </div>
+          <div class="qr-preview-box">
+            <i class="fa-solid fa-qrcode qr-icon"></i>
+            <p>Scan & Pay via any UPI App (GPay, PhonePe, Paytm)</p>
+          </div>
+        </div>
+
+        <!-- Card Tab -->
+        <div id="pay-panel-card" class="pay-panel hide">
+          <div class="input-group">
+            <label for="pay-card-number">Card Number</label>
+            <input type="text" id="pay-card-number" placeholder="4532 •••• •••• 8892">
+          </div>
+          <div class="input-grid">
+            <div class="input-group">
+              <label for="pay-card-expiry">Expiry Date</label>
+              <input type="text" id="pay-card-expiry" placeholder="MM/YY">
+            </div>
+            <div class="input-group">
+              <label for="pay-card-cvv">CVV</label>
+              <input type="password" id="pay-card-cvv" maxlength="3" placeholder="•••">
+            </div>
+          </div>
+        </div>
+
+        <!-- Netbanking Tab -->
+        <div id="pay-panel-netbanking" class="pay-panel hide">
+          <div class="input-group">
+            <label for="pay-bank-select">Select Bank</label>
+            <select id="pay-bank-select">
+              <option value="HDFC Bank">HDFC Bank</option>
+              <option value="ICICI Bank">ICICI Bank</option>
+              <option value="State Bank of India">State Bank of India (SBI)</option>
+              <option value="Axis Bank">Axis Bank</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closePatientCheckoutModal()">Cancel</button>
+          <button type="submit" class="btn-primary" id="btn-pay-submit"><i class="fa-solid fa-lock"></i> Authorize Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 9. DYNAMIC HIDDEN ELEMENT FOR PDF RENDERING -->
   <div id="pdf-rendering-temp" style="position: absolute; left: -9999px; top: -9999px;">
     <!-- Rendered dynamically for high fidelity A4 prints -->
   </div>

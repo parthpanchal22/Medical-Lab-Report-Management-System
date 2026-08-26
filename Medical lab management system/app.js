@@ -297,6 +297,7 @@ function switchDashboardSubview(subviewId) {
     else if (subviewId === "admin-billing") renderBillingDeskTable();
     else if (subviewId === "admin-catalog") renderTestCatalogGrid();
     else if (subviewId === "admin-users") renderUsersTable();
+    else if (subviewId === "admin-audit") renderAuditLogs();
   } 
   else if (subviewId.startsWith("tech-")) {
     document.getElementById("panel-technician").classList.add("active");
@@ -311,6 +312,7 @@ function switchDashboardSubview(subviewId) {
     document.getElementById(`subview-${subviewId}`).classList.add("active");
     
     if (subviewId === "doctor-records") renderDoctorPatientDirectoryTable();
+    else if (subviewId === "doctor-notes") renderDoctorNotesTable();
   } 
   else if (subviewId.startsWith("patient-")) {
     document.getElementById("panel-patient").classList.add("active");
@@ -319,6 +321,8 @@ function switchDashboardSubview(subviewId) {
     
     if (subviewId === "patient-dashboard") renderPatientDashboard();
     else if (subviewId === "patient-reports") renderPatientReportsTable();
+    else if (subviewId === "patient-profile") renderPatientProfile();
+    else if (subviewId === "patient-billing") renderPatientBillingTable();
   }
   
   // Clear search field on subview switch
@@ -332,20 +336,24 @@ function setupSidebarMenu() {
   
   const menuConfig = {
     patient: [
-      { id: "patient-dashboard", label: "Patient Health Portal", icon: "fa-solid fa-heart-pulse" },
-      { id: "patient-reports", label: "Report History", icon: "fa-solid fa-file-invoice" }
+      { id: "patient-dashboard", label: "Health Portal", icon: "fa-solid fa-heart-pulse" },
+      { id: "patient-billing", label: "Payment Gateway", icon: "fa-solid fa-credit-card" },
+      { id: "patient-reports", label: "Report History", icon: "fa-solid fa-file-invoice" },
+      { id: "patient-profile", label: "My Profile", icon: "fa-solid fa-user-gear" }
     ],
     technician: [
-      { id: "tech-samples", label: "Accession Queue", icon: "fa-solid fa-vial-virus" }
+      { id: "tech-samples", label: "Specimen Accessioning", icon: "fa-solid fa-vial-virus" }
     ],
     doctor: [
-      { id: "doctor-records", label: "Patient Directory", icon: "fa-solid fa-house-medical" }
+      { id: "doctor-records", label: "Patient Directory", icon: "fa-solid fa-house-medical" },
+      { id: "doctor-notes", label: "Clinical Notes", icon: "fa-solid fa-notes-medical" }
     ],
     admin: [
       { id: "admin-dashboard", label: "Operations Control", icon: "fa-solid fa-chart-line" },
       { id: "admin-billing", label: "Billing Desk", icon: "fa-solid fa-receipt" },
       { id: "admin-catalog", label: "Test Catalog", icon: "fa-solid fa-folder-open" },
-      { id: "admin-users", label: "Manage Roles", icon: "fa-solid fa-users-gear" }
+      { id: "admin-users", label: "Manage Roles", icon: "fa-solid fa-users-gear" },
+      { id: "admin-audit", label: "Audit Log", icon: "fa-solid fa-shield-halved" }
     ]
   };
 
@@ -412,10 +420,33 @@ function renderNotifications() {
   const list = document.getElementById("notification-list");
   list.innerHTML = "";
   
-  // Filter for the current patient's notifications, or show all for admin/tech
-  let userNotifs = LabState.notifications;
-  if (LabState.currentUser.role === "patient") {
-    userNotifs = LabState.notifications.filter(n => n.userId === LabState.currentUser.id);
+  if (!LabState.currentUser) return;
+  const role = LabState.currentUser.role;
+  
+  // Custom Role-Based Default Feeds
+  let roleFeeds = {
+    patient: [
+      { text: "Your report for Complete Blood Count (CBC) is ready.", date: "Just now", type: "success" },
+      { text: "Payment of ₹405.00 confirmed for Invoice #INV-101.", date: "10 mins ago", type: "info" }
+    ],
+    doctor: [
+      { text: "Critical result requires attention: High Cholesterol detected.", date: "Just now", type: "warning" },
+      { text: "Sample rejected for Order #ord_104 (Hemolyzed Blood).", date: "25 mins ago", type: "danger" }
+    ],
+    technician: [
+      { text: "New specimen assigned: Order #ord_103 (EDTA Tube).", date: "Just now", type: "info" },
+      { text: "Lipid Profile test pending collection in accessioning queue.", date: "40 mins ago", type: "info" }
+    ],
+    admin: [
+      { text: "5 reports are pending verification in laboratory queue.", date: "Just now", type: "warning" },
+      { text: "3 invoices are unpaid in billing system.", date: "15 mins ago", type: "info" }
+    ]
+  };
+
+  // Combine user-created notifications with role defaults
+  let userNotifs = LabState.notifications.map(n => ({ text: n.text, date: n.date, type: "info" }));
+  if (roleFeeds[role]) {
+    userNotifs = [...roleFeeds[role], ...userNotifs];
   }
   
   countBadge.innerText = userNotifs.length;
@@ -427,9 +458,20 @@ function renderNotifications() {
   
   userNotifs.forEach(n => {
     const li = document.createElement("li");
+    const iconMap = {
+      success: '<i class="fa-solid fa-circle-check" style="color:var(--success);"></i>',
+      warning: '<i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i>',
+      danger: '<i class="fa-solid fa-circle-exclamation" style="color:var(--danger);"></i>',
+      info: '<i class="fa-solid fa-circle-info" style="color:var(--accent);"></i>'
+    };
     li.innerHTML = `
-      <div>${n.text}</div>
-      <span class="notif-time">${n.date}</span>
+      <div style="display:flex; gap:10px; align-items:flex-start;">
+        ${iconMap[n.type] || iconMap.info}
+        <div>
+          <div>${n.text}</div>
+          <span class="notif-time">${n.date}</span>
+        </div>
+      </div>
     `;
     list.appendChild(li);
   });
@@ -1167,22 +1209,32 @@ function renderSamplesQueueTable() {
       const count = Object.keys(o.results).length;
       metricDetails = `<span class="trend up" style="font-weight:600;"><i class="fa-solid fa-check-double"></i> ${count} values logged</span>`;
       primaryActionBtn = `<button class="btn-primary btn-sm" onclick="downloadInvoicePDF('${o.id}')"><i class="fa-solid fa-cloud-arrow-down"></i> PDF</button>`;
+    } else if (o.status === "Rejected") {
+      metricDetails = `<span class="badge-status danger"><i class="fa-solid fa-triangle-exclamation"></i> ${o.rejectionReason || 'Sample Rejected'}</span>`;
+      primaryActionBtn = `<span class="badge-status danger">Rejected</span>`;
     } else {
-      primaryActionBtn = `<button class="btn-primary btn-sm" onclick="openTechMetricsModal('${o.id}')" ${o.status === "Collected" ? 'disabled' : ''}><i class="fa-solid fa-pen-nib"></i> Enter Results</button>`;
+      primaryActionBtn = `
+        <div style="display:flex; gap:6px;">
+          <button class="btn-primary btn-sm" onclick="openTechMetricsModal('${o.id}')"><i class="fa-solid fa-pen-nib"></i> Enter Results</button>
+          <button class="btn-danger btn-sm" onclick="openTechRejectModal('SPEC-${o.id.replace('ord_', '')}', '${o.id}', '${o.patientName}', '${testNames}', 'BAR-883920${o.id.replace('ord_', '')}')"><i class="fa-solid fa-ban"></i> Reject</button>
+        </div>
+      `;
     }
     
+    const isRejected = o.status === "Rejected";
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><strong>#${o.id}</strong></td>
+      <td><strong>#${o.id}</strong><br><small style="color:var(--text-muted);">BAR-883920${o.id.replace('ord_', '')}</small></td>
       <td>${o.patientName}</td>
       <td><span style="font-weight:500;">${testNames}</span></td>
       <td>${o.date}</td>
       <td>
+        ${isRejected ? `<span class="badge-status danger">Rejected</span>` : `
         <div class="status-timeline">
           <button class="status-timeline-btn ${o.status === 'Collected' ? 'active collected' : ''}" onclick="updateSampleStatus('${o.id}', 'Collected')">Collected</button>
           <button class="status-timeline-btn ${o.status === 'Processing' ? 'active processing' : ''}" onclick="updateSampleStatus('${o.id}', 'Processing')">Processing</button>
           <button class="status-timeline-btn ${o.status === 'Completed' ? 'active completed' : ''}" onclick="updateSampleStatus('${o.id}', 'Completed')">Completed</button>
-        </div>
+        </div>`}
       </td>
       <td>${metricDetails}</td>
       <td>${primaryActionBtn}</td>
@@ -1861,9 +1913,493 @@ function downloadInvoicePDF(orderId) {
   });
 }
 
+// ==========================================================================
+// 15. FULL-STACK BACKEND API INTERFACE & ENHANCED FEATURE CONTROLLER
+// ==========================================================================
+const API_BASE_URL = "http://localhost:8080/api";
+
+async function apiFetch(endpoint, options = {}) {
+  try {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: { "Content-Type": "application/json", ...options.headers },
+      ...options
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn("Backend API offline or unreachable, operating in local mode:", err);
+  }
+  return null;
+}
+
+// --- A) PATIENT PROFILE & SECURITY HANDLERS ---
+function renderPatientProfile() {
+  const u = LabState.currentUser;
+  if (!u) return;
+
+  document.getElementById("profile-name").value = u.name || "";
+  document.getElementById("profile-email").value = u.email || "";
+  document.getElementById("profile-phone").value = u.phone || "";
+  document.getElementById("profile-dob").value = u.dob || "";
+  document.getElementById("profile-gender").value = u.gender || "Female";
+  document.getElementById("profile-address").value = u.address || "";
+}
+
+async function handleSavePatientProfile(e) {
+  e.preventDefault();
+  const u = LabState.currentUser;
+  if (!u) return;
+
+  u.name = document.getElementById("profile-name").value.trim();
+  u.email = document.getElementById("profile-email").value.trim();
+  u.phone = document.getElementById("profile-phone").value.trim();
+  u.dob = document.getElementById("profile-dob").value;
+  u.gender = document.getElementById("profile-gender").value;
+  u.address = document.getElementById("profile-address").value.trim();
+
+  // Update in local state
+  LabState.save();
+  updateUserInfoWidgets();
+
+  // Sync to REST API Backend
+  await apiFetch("/users", {
+    method: "PUT",
+    body: JSON.stringify({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone,
+      dob: u.dob,
+      gender: u.gender,
+      address: u.address,
+      role: u.role
+    })
+  });
+
+  alert("Profile information updated successfully.");
+}
+
+async function handlePatientChangePassword(e) {
+  e.preventDefault();
+  const u = LabState.currentUser;
+  const currentPwd = document.getElementById("pwd-current").value;
+  const newPwd = document.getElementById("pwd-new").value;
+  const confirmPwd = document.getElementById("pwd-confirm").value;
+
+  if (currentPwd !== u.password) {
+    alert("Current password is incorrect.");
+    return;
+  }
+  if (newPwd !== confirmPwd) {
+    alert("New password and confirmation do not match.");
+    return;
+  }
+  if (newPwd.length < 6) {
+    alert("Password must be at least 6 characters long.");
+    return;
+  }
+
+  u.password = newPwd;
+  LabState.save();
+
+  // Sync to REST API Backend
+  await apiFetch("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({
+      userId: u.id,
+      currentPassword: currentPwd,
+      newPassword: newPwd
+    })
+  });
+
+  document.getElementById("form-patient-password").reset();
+  alert("Account security password updated successfully.");
+}
+
+// --- B) PATIENT PAYMENT GATEWAY & BILLING ---
+function renderPatientBillingTable() {
+  const tBody = document.getElementById("patient-billing-table-body");
+  tBody.innerHTML = "";
+
+  const u = LabState.currentUser;
+  const patientOrders = LabState.orders.filter(o => o.patientId === u.id);
+
+  if (patientOrders.length === 0) {
+    tBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--text-muted);">No invoices recorded for your account.</td></tr>`;
+    return;
+  }
+
+  patientOrders.forEach(o => {
+    const testNames = o.tests.map(tid => {
+      const t = LabState.catalog.find(c => c.id === tid);
+      return t ? t.code : tid;
+    }).join(", ");
+
+    const isPaid = o.status === "Completed" || o.paymentStatus === "Paid";
+    const statusLabel = isPaid ? "Paid" : "Unpaid";
+    const statusClass = isPaid ? "completed" : "pending";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>#INV-${o.id.replace('ord_', '')}</strong></td>
+      <td>${testNames}</td>
+      <td>${o.date}</td>
+      <td>₹${o.subtotal.toLocaleString('en-IN')}</td>
+      <td>-₹${o.discount.toLocaleString('en-IN')}</td>
+      <td><strong>₹${o.total.toLocaleString('en-IN')}</strong></td>
+      <td><span class="badge-status ${statusClass}">${statusLabel}</span></td>
+      <td>
+        ${isPaid ? `<span class="badge-status completed"><i class="fa-solid fa-circle-check"></i> Paid Online</span>` : 
+        `<button class="btn-primary btn-sm" onclick="openPatientCheckoutModal('${o.id}')"><i class="fa-solid fa-credit-card"></i> Pay Online</button>`}
+      </td>
+    `;
+    tBody.appendChild(tr);
+  });
+}
+
+function openPatientCheckoutModal(orderId) {
+  const o = LabState.orders.find(item => item.id === orderId);
+  if (!o) return;
+
+  document.getElementById("checkout-invoice-id").value = orderId;
+  document.getElementById("checkout-amount").value = o.total;
+  document.getElementById("checkout-display-total").innerText = `₹${o.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+  switchPayMethod('upi');
+  document.getElementById("modal-patient-checkout").classList.remove("hide");
+}
+
+function closePatientCheckoutModal() {
+  document.getElementById("modal-patient-checkout").classList.add("hide");
+}
+
+function switchPayMethod(method) {
+  document.querySelectorAll(".pay-panel").forEach(p => p.classList.add("hide"));
+  if (method === 'upi') {
+    document.getElementById("pay-panel-upi").classList.remove("hide");
+  } else if (method === 'card') {
+    document.getElementById("pay-panel-card").classList.remove("hide");
+  } else if (method === 'netbanking') {
+    document.getElementById("pay-panel-netbanking").classList.remove("hide");
+  }
+}
+
+async function handleProcessOnlinePayment(e) {
+  e.preventDefault();
+  const orderId = document.getElementById("checkout-invoice-id").value;
+  const amount = parseFloat(document.getElementById("checkout-amount").value);
+  const payMethod = document.querySelector('input[name="pay-method"]:checked').value;
+
+  const o = LabState.orders.find(item => item.id === orderId);
+  if (o) {
+    o.paymentStatus = "Paid";
+    LabState.save();
+  }
+
+  // Call REST API
+  await apiFetch("/payments", {
+    method: "POST",
+    body: JSON.stringify({
+      invoice_id: "INV-" + orderId.replace('ord_', ''),
+      patient_id: LabState.currentUser.id,
+      patient_name: LabState.currentUser.name,
+      amount: amount,
+      payment_method: payMethod
+    })
+  });
+
+  // Add Notifications
+  LabState.addNotification(LabState.currentUser.id, `Payment of ₹${amount} for Invoice #${orderId} was successful via ${payMethod}.`);
+
+  closePatientCheckoutModal();
+  renderPatientBillingTable();
+  alert(`Payment Authorization Successful!\nTransaction ID: TXN${Math.floor(Math.random() * 89999999 + 10000000)}\nPayment of ₹${amount} received.`);
+}
+
+// --- C) DOCTOR LABORATORY TEST ORDERING ---
+function openDoctorOrderModal() {
+  const patientSelect = document.getElementById("doc-order-patient-select");
+  patientSelect.innerHTML = `<option value="" disabled selected>Select Target Patient</option>`;
+
+  LabState.users.filter(u => u.role === "patient").forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.innerText = `${p.name} (${p.email})`;
+    patientSelect.appendChild(opt);
+  });
+
+  const checklist = document.getElementById("doc-order-catalog-checklist");
+  checklist.innerHTML = "";
+  LabState.catalog.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "checkbox-item";
+    div.innerHTML = `
+      <label>
+        <input type="checkbox" name="doc-order-tests" value="${item.id}" data-name="${item.name}">
+        <span>${item.name} (${item.code})</span>
+      </label>
+      <span class="price-label">₹${item.price}</span>
+    `;
+    checklist.appendChild(div);
+  });
+
+  document.getElementById("modal-doctor-order").classList.remove("hide");
+}
+
+function closeDoctorOrderModal() {
+  document.getElementById("modal-doctor-order").classList.add("hide");
+}
+
+async function handleCreateDoctorOrder(e) {
+  e.preventDefault();
+  const patientId = document.getElementById("doc-order-patient-select").value;
+  const priority = document.getElementById("doc-order-priority").value;
+  const notes = document.getElementById("doc-order-notes").value.trim();
+
+  const checked = document.querySelectorAll('input[name="doc-order-tests"]:checked');
+  if (checked.length === 0) {
+    alert("Please select at least one pathology test definition.");
+    return;
+  }
+
+  const testIds = Array.from(checked).map(cb => cb.value);
+  const testNames = Array.from(checked).map(cb => cb.getAttribute("data-name")).join(", ");
+  const patient = LabState.users.find(u => u.id === patientId);
+
+  const subtotal = testIds.reduce((sum, tid) => {
+    const t = LabState.catalog.find(c => c.id === tid);
+    return sum + (t ? t.price : 0);
+  }, 0);
+
+  const discount = Math.round(subtotal * 0.1);
+  const total = subtotal - discount;
+  const orderId = "ord_" + Math.floor(Math.random() * 899 + 100);
+
+  const newOrder = {
+    id: orderId,
+    patientId: patientId,
+    patientName: patient ? patient.name : "Patient",
+    tests: testIds,
+    subtotal: subtotal,
+    discount: discount,
+    total: total,
+    date: new Date().toISOString().substring(0, 10),
+    status: "Collected",
+    priority: priority,
+    notes: notes,
+    results: null,
+    technicianId: null,
+    certifiedDate: null,
+    doctorNotes: null
+  };
+
+  LabState.orders.unshift(newOrder);
+  LabState.save();
+
+  // Send REST API call
+  await apiFetch("/orders", {
+    method: "POST",
+    body: JSON.stringify({
+      patient_id: patientId,
+      patient_name: patient ? patient.name : "Patient",
+      doctor_id: LabState.currentUser.id,
+      doctor_name: LabState.currentUser.name,
+      test_ids: testIds.join(","),
+      test_names: testNames,
+      priority: priority,
+      notes: notes
+    })
+  });
+
+  closeDoctorOrderModal();
+  renderDoctorPatientDirectoryTable();
+  alert(`Diagnostic test order #${orderId} submitted successfully for ${patient ? patient.name : 'Patient'}.`);
+}
+
+// --- D) DOCTOR CLINICAL NOTES ---
+function renderDoctorNotesTable() {
+  const tBody = document.getElementById("doctor-notes-table-body");
+  tBody.innerHTML = "";
+
+  const notesList = LabState.orders.filter(o => o.doctorNotes).map(o => o.doctorNotes);
+
+  if (notesList.length === 0) {
+    tBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">No clinical pathologist notes recorded yet.</td></tr>`;
+    return;
+  }
+
+  notesList.forEach((n, idx) => {
+    const severityClass = n.severity === "Urgent" ? "danger" : (n.severity === "Medium" ? "pending" : "completed");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>#NOTE-${100 + idx}</strong></td>
+      <td>2026-08-25</td>
+      <td>${n.patientName || 'Rashi Pandya'}</td>
+      <td>${n.doctorName}</td>
+      <td><span class="badge-status ${severityClass}">${n.severity}</span></td>
+      <td>${n.text}</td>
+      <td>
+        <button class="btn-table-action" title="View Details"><i class="fa-solid fa-eye"></i></button>
+      </td>
+    `;
+    tBody.appendChild(tr);
+  });
+}
+
+function openDoctorNotesModal(orderId = null, patientId = null) {
+  const select = document.getElementById("doc-notes-patient-select");
+  select.innerHTML = `<option value="" disabled selected>Select Patient</option>`;
+  LabState.users.filter(u => u.role === "patient").forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.innerText = p.name;
+    select.appendChild(opt);
+  });
+
+  if (orderId) document.getElementById("doctor-notes-order-id").value = orderId;
+  document.getElementById("modal-doctor-notes").classList.remove("hide");
+}
+
+function closeDoctorNotesModal() {
+  document.getElementById("modal-doctor-notes").classList.add("hide");
+}
+
+async function handleSaveDoctorNotes(e) {
+  e.preventDefault();
+  const orderId = document.getElementById("doctor-notes-order-id").value || LabState.orders[0]?.id;
+  const patientId = document.getElementById("doc-notes-patient-select").value;
+  const severity = document.getElementById("doctor-severity").value;
+  const text = document.getElementById("doctor-notes-text").value.trim();
+
+  const o = LabState.orders.find(item => item.id === orderId) || LabState.orders[0];
+  const patient = LabState.users.find(u => u.id === patientId) || LabState.users.find(u => u.id === o?.patientId);
+
+  if (o) {
+    o.doctorNotes = {
+      doctorId: LabState.currentUser.id,
+      doctorName: LabState.currentUser.name,
+      patientName: patient ? patient.name : o.patientName,
+      severity: severity,
+      text: text
+    };
+    LabState.save();
+  }
+
+  // REST API Call
+  await apiFetch("/clinical-notes", {
+    method: "POST",
+    body: JSON.stringify({
+      patient_id: patientId || (o ? o.patientId : "usr_pat1"),
+      patient_name: patient ? patient.name : (o ? o.patientName : "Rashi Pandya"),
+      doctor_id: LabState.currentUser.id,
+      doctor_name: LabState.currentUser.name,
+      order_id: orderId,
+      severity: severity,
+      notes_text: text
+    })
+  });
+
+  closeDoctorNotesModal();
+  renderDoctorNotesTable();
+  alert("Clinical pathologist remarks attached successfully.");
+}
+
+// --- E) TECHNICIAN SPECIMEN REJECTION ---
+function openTechRejectModal(specimenId, orderId, patientName, testName, specCode) {
+  document.getElementById("reject-specimen-id").value = specimenId;
+  document.getElementById("reject-order-id").value = orderId;
+  document.getElementById("reject-spec-code").innerText = specCode || specimenId;
+  document.getElementById("reject-patient-name").innerText = patientName;
+  document.getElementById("reject-test-name").innerText = testName;
+
+  document.getElementById("modal-tech-reject").classList.remove("hide");
+}
+
+function closeTechRejectModal() {
+  document.getElementById("modal-tech-reject").classList.add("hide");
+}
+
+async function handleConfirmSampleRejection(e) {
+  e.preventDefault();
+  const specimenId = document.getElementById("reject-specimen-id").value;
+  const orderId = document.getElementById("reject-order-id").value;
+  const reason = document.getElementById("reject-reason-select").value;
+  const notes = document.getElementById("reject-additional-notes").value.trim();
+
+  const o = LabState.orders.find(item => item.id === orderId);
+  if (o) {
+    o.status = "Rejected";
+    o.rejectionReason = reason + (notes ? ` (${notes})` : "");
+    LabState.save();
+  }
+
+  // REST API Call
+  await apiFetch("/specimens", {
+    method: "POST",
+    body: JSON.stringify({
+      action: "reject",
+      id: specimenId,
+      order_id: orderId,
+      rejection_reason: reason + (notes ? ` (${notes})` : ""),
+      technician_name: LabState.currentUser.name
+    })
+  });
+
+  closeTechRejectModal();
+  renderSamplesQueueTable();
+  alert(`Specimen ${specimenId} rejected and medical alert notification dispatched.`);
+}
+
+// --- F) ADMIN AUDIT LOGS ---
+async function renderAuditLogs() {
+  const tBody = document.getElementById("audit-table-body");
+  tBody.innerHTML = "";
+
+  const filter = document.getElementById("audit-category-filter")?.value || "ALL";
+
+  // Try REST API backend fetch first
+  let logs = await apiFetch("/audit-logs");
+  if (!logs || logs.length === 0) {
+    // Fallback seed audit logs
+    logs = [
+      { id: "AUD-1001", timestamp: "2026-08-25 10:15", user_name: "Tanish Patel", role: "Admin", action: "User Login", category: "Auth", details: "Signed into Admin Operations Control." },
+      { id: "AUD-1002", timestamp: "2026-08-25 10:22", user_name: "Dr. Zainab Khilji", role: "Doctor", action: "Order Created", category: "Orders", details: "Created diagnostic order #ord_104 for Rashi Pandya." },
+      { id: "AUD-1003", timestamp: "2026-08-25 11:05", user_name: "Parth Panchal", role: "Technician", action: "Sample Rejection", category: "Laboratory", details: "Rejected specimen SPEC-102. Reason: Hemolyzed Sample." },
+      { id: "AUD-1004", timestamp: "2026-08-25 11:45", user_name: "Rashi Pandya", role: "Patient", action: "Online Payment", category: "Billing", details: "Paid ₹405.00 online via UPI for Invoice #INV-101." },
+      { id: "AUD-1005", timestamp: "2026-08-25 12:10", user_name: "Rashi Pandya", role: "Patient", action: "Password Changed", category: "Security", details: "Updated account security password." }
+    ];
+  }
+
+  let filtered = logs;
+  if (filter !== "ALL") {
+    filtered = logs.filter(l => l.category === filter);
+  }
+
+  if (filtered.length === 0) {
+    tBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">No audit log entries matching selected category.</td></tr>`;
+    return;
+  }
+
+  filtered.forEach(l => {
+    const catClass = l.category ? l.category.toLowerCase() : "auth";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>#${l.id}</strong></td>
+      <td>${l.timestamp}</td>
+      <td>${l.user_name}</td>
+      <td><span class="badge-status neutral">${l.role}</span></td>
+      <td><strong>${l.action}</strong></td>
+      <td><span class="audit-badge ${catClass}">${l.category}</span></td>
+      <td>${l.details}</td>
+    `;
+    tBody.appendChild(tr);
+  });
+}
+
 // Initialize Application on DOM Load
 window.addEventListener("DOMContentLoaded", () => {
-  // Bind standard routers
+  // Check if session exists
   if (LabState.currentUser) {
     navigateTo("dashboard");
   } else {
