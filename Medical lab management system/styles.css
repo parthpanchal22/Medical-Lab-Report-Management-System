@@ -2054,3 +2054,19 @@ input:focus, select:focus, textarea:focus {
   background-color: #b91c1c;
 }
 
+.btn-forgot-pwd {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: color var(--transition-fast);
+}
+
+.btn-forgot-pwd:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+

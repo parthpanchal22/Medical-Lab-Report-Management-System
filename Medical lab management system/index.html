@@ -55,6 +55,9 @@
               <label for="login-password"><i class="fa-solid fa-lock"></i> Password</label>
               <input type="password" id="login-password" required placeholder="••••••••">
             </div>
+            <div style="text-align: right; margin-top: -6px; margin-bottom: 12px;">
+              <button type="button" class="btn-forgot-pwd" onclick="openForgotPasswordModal()" style="background:none; border:none; color:var(--accent); font-size:12px; font-weight:600; cursor:pointer; text-decoration:underline;"><i class="fa-solid fa-key"></i> Forgot Password?</button>
+            </div>
             <div class="role-selector-wrapper">
               <label class="label-heading"><i class="fa-solid fa-user-tag"></i> Access Role</label>
               <div class="role-grid">
@@ -634,30 +637,6 @@
                     <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Update Profile Info</button>
                   </form>
                 </div>
-
-                <!-- Password Security Card -->
-                <div class="profile-card">
-                  <div class="profile-card-header">
-                    <h3><i class="fa-solid fa-shield-halved"></i> Change Security Password</h3>
-                  </div>
-                  <form id="form-patient-password" onsubmit="handlePatientChangePassword(event)">
-                    <div class="input-group">
-                      <label for="pwd-current">Current Password</label>
-                      <input type="password" id="pwd-current" required placeholder="••••••••">
-                    </div>
-                    <div class="input-grid">
-                      <div class="input-group">
-                        <label for="pwd-new">New Password</label>
-                        <input type="password" id="pwd-new" required placeholder="••••••••">
-                      </div>
-                      <div class="input-group">
-                        <label for="pwd-confirm">Confirm New Password</label>
-                        <input type="password" id="pwd-confirm" required placeholder="••••••••">
-                      </div>
-                    </div>
-                    <button type="submit" class="btn-secondary"><i class="fa-solid fa-key"></i> Update Security Password</button>
-                  </form>
-                </div>
               </div>
             </div>
 
@@ -1118,6 +1097,48 @@
         <div class="modal-footer">
           <button type="button" class="btn-secondary" onclick="closePatientCheckoutModal()">Cancel</button>
           <button type="submit" class="btn-primary" id="btn-pay-submit"><i class="fa-solid fa-lock"></i> Authorize Payment</button>
+        </div>
+      </form>
+    </div>
+  <!-- 8.5. FORGOT PASSWORD MODAL -->
+  <div class="modal-backdrop hide" id="modal-forgot-password">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-key"></i> Account Password Reset</h2>
+        <button class="btn-close-modal" onclick="closeForgotPasswordModal()">&times;</button>
+      </div>
+      
+      <!-- Step 1: Verify Registered Email -->
+      <form id="form-forgot-step1" onsubmit="handleVerifyEmailForReset(event)">
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:15px; line-height:1.5;">
+          Enter your registered account email below. We will verify your account in SQLite to allow a password reset.
+        </p>
+        <div class="input-group">
+          <label for="forgot-email"><i class="fa-regular fa-envelope"></i> Registered Email Address</label>
+          <input type="email" id="forgot-email" required placeholder="email@apexlabs.com">
+        </div>
+        <div class="modal-footer" style="margin-top:20px;">
+          <button type="button" class="btn-secondary" onclick="closeForgotPasswordModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Verify Email</button>
+        </div>
+      </form>
+
+      <!-- Step 2: Reset Password (Hidden by default) -->
+      <form id="form-forgot-step2" class="hide" onsubmit="handleResetPasswordSubmit(event)">
+        <div style="background:var(--accent-light); padding:10px 14px; border-radius:8px; border:1px solid var(--accent-subtle); margin-bottom:15px; font-size:13px;">
+          <strong>Account Verified:</strong> <span id="forgot-verified-name" style="font-weight:600;">-</span> (<span id="forgot-verified-email">-</span>)
+        </div>
+        <div class="input-group">
+          <label for="forgot-new-password"><i class="fa-solid fa-lock"></i> New Security Password</label>
+          <input type="password" id="forgot-new-password" required minlength="6" placeholder="••••••••">
+        </div>
+        <div class="input-group">
+          <label for="forgot-confirm-password"><i class="fa-solid fa-lock"></i> Confirm New Password</label>
+          <input type="password" id="forgot-confirm-password" required minlength="6" placeholder="••••••••">
+        </div>
+        <div class="modal-footer" style="margin-top:20px;">
+          <button type="button" class="btn-secondary" onclick="closeForgotPasswordModal()">Cancel</button>
+          <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Update & Save Password</button>
         </div>
       </form>
     </div>

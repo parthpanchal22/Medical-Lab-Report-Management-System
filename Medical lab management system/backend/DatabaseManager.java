@@ -387,42 +387,6 @@ public class DatabaseManager {
             pstmt.executeBatch();
         }
 
-        // 8. Seed Notifications
-        String insertNotif = "INSERT INTO notifications (id, target_role, message, type) VALUES (?, ?, ?, ?)";
-        try (PreparedStatement pstmt = conn.prepareStatement(insertNotif)) {
-            pstmt.setString(1, "NOTIF-1");
-            pstmt.setString(2, "patient");
-            pstmt.setString(3, "Your report for Complete Blood Count (CBC) is ready to download.");
-            pstmt.setString(4, "success");
-            pstmt.addBatch();
-
-            pstmt.setString(1, "NOTIF-2");
-            pstmt.setString(2, "doctor");
-            pstmt.setString(3, "Critical result requires attention: High Glucose detected for sample SPEC-102.");
-            pstmt.setString(4, "warning");
-            pstmt.addBatch();
-
-            pstmt.setString(1, "NOTIF-3");
-            pstmt.setString(2, "technician");
-            pstmt.setString(3, "New specimen assigned: Order #ORD-502 (Serum Separator Tube).");
-            pstmt.setString(4, "info");
-            pstmt.addBatch();
-
-            pstmt.setString(1, "NOTIF-4");
-            pstmt.setString(2, "admin");
-            pstmt.setString(3, "5 reports are pending verification in laboratory queue.");
-            pstmt.setString(4, "warning");
-            pstmt.addBatch();
-
-            pstmt.setString(1, "NOTIF-5");
-            pstmt.setString(2, "billing");
-            pstmt.setString(3, "3 invoices are unpaid in billing system.");
-            pstmt.setString(4, "info");
-            pstmt.addBatch();
-
-            pstmt.executeBatch();
-        }
-
         System.out.println("Initial LIMS clinical seed data inserted successfully.");
     }
 }

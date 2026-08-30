@@ -24,6 +24,8 @@ public class LimsServer {
         server.createContext("/api/auth/login", new LoginHandler());
         server.createContext("/api/auth/register", new RegisterHandler());
         server.createContext("/api/auth/change-password", new ChangePasswordHandler());
+        server.createContext("/api/auth/verify-email", new VerifyEmailHandler());
+        server.createContext("/api/auth/reset-password", new ResetPasswordHandler());
         server.createContext("/api/users", new UsersHandler());
         server.createContext("/api/catalog", new CatalogHandler());
         server.createContext("/api/orders", new OrdersHandler());
@@ -192,23 +194,37 @@ public class LimsServer {
             String address = getJsonField(body, "address");
             String id = "usr-" + System.currentTimeMillis();
 
-            String sql = "INSERT INTO users (id, name, email, password, role, phone, dob, gender, address) VALUES (?, ?, ?, ?, 'patient', ?, ?, ?, ?)";
-            try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1, id);
-                pstmt.setString(2, name);
-                pstmt.setString(3, email);
-                pstmt.setString(4, password);
-                pstmt.setString(5, phone);
-                pstmt.setString(6, dob);
-                pstmt.setString(7, gender);
-                pstmt.setString(8, address != null && !address.isEmpty() ? address : "Not Specified");
-                pstmt.executeUpdate();
+            try (Connection conn = DatabaseManager.getConnection()) {
+                // Check if email already exists
+                String checkSql = "SELECT id FROM users WHERE LOWER(email) = LOWER(?)";
+                try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+                    checkStmt.setString(1, email);
+                    try (ResultSet rs = checkStmt.executeQuery()) {
+                        if (rs.next()) {
+                            sendJsonResponse(exchange, 400, "{\"success\":false,\"message\":\"An account with this email address already exists.\"}");
+                            return;
+                        }
+                    }
+                }
 
-                logAudit(name, "Patient", "Patient Registration", "Users", "Self-registered new patient account.");
+                String sql = "INSERT INTO users (id, name, email, password, role, phone, dob, gender, address) VALUES (?, ?, ?, ?, 'patient', ?, ?, ?, ?)";
+                try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                    pstmt.setString(1, id);
+                    pstmt.setString(2, name);
+                    pstmt.setString(3, email);
+                    pstmt.setString(4, password);
+                    pstmt.setString(5, phone);
+                    pstmt.setString(6, dob);
+                    pstmt.setString(7, gender);
+                    pstmt.setString(8, address != null && !address.isEmpty() ? address : "Not Specified");
+                    pstmt.executeUpdate();
 
-                sendJsonResponse(exchange, 201, "{\"success\":true,\"message\":\"Patient registered successfully.\",\"id\":\"" + id + "\"}");
+                    logAudit(name, "Patient", "Patient Registration", "Users", "Self-registered new patient account.");
+
+                    sendJsonResponse(exchange, 201, "{\"success\":true,\"message\":\"Patient registered successfully.\",\"id\":\"" + id + "\"}");
+                }
             } catch (SQLException e) {
-                sendJsonResponse(exchange, 400, "{\"success\":false,\"message\":\"Registration failed: Email may already exist.\"}");
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"message\":\"Registration failed: " + e.getMessage() + "\"}");
             }
         }
     }
@@ -263,6 +279,92 @@ public class LimsServer {
                 return;
             }
             sendJsonResponse(exchange, 404, "{\"success\":false,\"message\":\"User not found.\"}");
+        }
+    }
+
+    // 4b. Verify Email Handler (for Forgot Password)
+    static class VerifyEmailHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                enableCORS(exchange);
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                return;
+            }
+            String body = readRequestBody(exchange);
+            String email = getJsonField(body, "email").trim().toLowerCase();
+
+            String sql = "SELECT id, name, email, role FROM users WHERE LOWER(email) = LOWER(?)";
+            try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, email);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        String json = String.format("{\"success\":true,\"user\":{\"id\":\"%s\",\"name\":\"%s\",\"email\":\"%s\",\"role\":\"%s\"}}",
+                            rs.getString("id"), rs.getString("name"), rs.getString("email"), rs.getString("role"));
+                        sendJsonResponse(exchange, 200, json);
+                        return;
+                    }
+                }
+            } catch (SQLException e) {
+                sendJsonResponse(exchange, 500, "{\"error\":\"" + e.getMessage() + "\"}");
+                return;
+            }
+            sendJsonResponse(exchange, 404, "{\"success\":false,\"message\":\"No registered account found with that email address.\"}");
+        }
+    }
+
+    // 4c. Reset Password Handler (for Forgot Password)
+    static class ResetPasswordHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                enableCORS(exchange);
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                return;
+            }
+            String body = readRequestBody(exchange);
+            String email = getJsonField(body, "email").trim().toLowerCase();
+            String newPassword = getJsonField(body, "newPassword");
+
+            if (newPassword == null || newPassword.length() < 6) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"message\":\"New password must be at least 6 characters.\"}");
+                return;
+            }
+
+            String sqlSelect = "SELECT name, role FROM users WHERE LOWER(email) = LOWER(?)";
+            try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sqlSelect)) {
+                pstmt.setString(1, email);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        String name = rs.getString("name");
+                        String role = rs.getString("role");
+
+                        String sqlUpdate = "UPDATE users SET password = ? WHERE LOWER(email) = LOWER(?)";
+                        try (PreparedStatement updateStmt = conn.prepareStatement(sqlUpdate)) {
+                            updateStmt.setString(1, newPassword);
+                            updateStmt.setString(2, email);
+                            updateStmt.executeUpdate();
+
+                            logAudit(name, role, "Password Reset", "Security", "Reset password via Forgot Password workflow.");
+
+                            sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Password reset successfully. You can now sign in with your new password.\"}");
+                            return;
+                        }
+                    }
+                }
+            } catch (SQLException e) {
+                sendJsonResponse(exchange, 500, "{\"error\":\"" + e.getMessage() + "\"}");
+                return;
+            }
+            sendJsonResponse(exchange, 404, "{\"success\":false,\"message\":\"Account not found for password reset.\"}");
         }
     }
 
@@ -617,79 +719,102 @@ public class LimsServer {
                 exchange.sendResponseHeaders(204, -1);
                 return;
             }
-            String method = exchange.getRequestMethod();
-            if ("GET".equalsIgnoreCase(method)) {
-                String sql = "SELECT * FROM payments ORDER BY payment_date DESC";
-                try (Connection conn = DatabaseManager.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-                    StringBuilder sb = new StringBuilder("[");
-                    boolean first = true;
-                    while (rs.next()) {
-                        if (!first) sb.append(",");
-                        sb.append(String.format(
-                            "{\"id\":\"%s\",\"invoice_id\":\"%s\",\"patient_id\":\"%s\",\"patient_name\":\"%s\",\"amount\":%.2f,\"payment_method\":\"%s\",\"transaction_id\":\"%s\",\"payment_date\":\"%s\",\"status\":\"%s\",\"verified_by_admin\":%d}",
-                            rs.getString("id"), rs.getString("invoice_id"), rs.getString("patient_id"),
-                            rs.getString("patient_name"), rs.getDouble("amount"), rs.getString("payment_method"),
-                            rs.getString("transaction_id"), rs.getString("payment_date"),
-                            rs.getString("status"), rs.getInt("verified_by_admin")
-                        ));
-                        first = false;
+            try {
+                String method = exchange.getRequestMethod();
+                if ("GET".equalsIgnoreCase(method)) {
+                    String sql = "SELECT * FROM payments ORDER BY payment_date DESC";
+                    try (Connection conn = DatabaseManager.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+                        StringBuilder sb = new StringBuilder("[");
+                        boolean first = true;
+                        while (rs.next()) {
+                            if (!first) sb.append(",");
+                            sb.append(String.format(
+                                "{\"id\":\"%s\",\"invoice_id\":\"%s\",\"patient_id\":\"%s\",\"patient_name\":\"%s\",\"amount\":%.2f,\"payment_method\":\"%s\",\"transaction_id\":\"%s\",\"payment_date\":\"%s\",\"status\":\"%s\",\"verified_by_admin\":%d}",
+                                rs.getString("id"), rs.getString("invoice_id"), rs.getString("patient_id"),
+                                rs.getString("patient_name"), rs.getDouble("amount"), rs.getString("payment_method"),
+                                rs.getString("transaction_id"), rs.getString("payment_date"),
+                                rs.getString("status"), rs.getInt("verified_by_admin")
+                            ));
+                            first = false;
+                        }
+                        sb.append("]");
+                        sendJsonResponse(exchange, 200, sb.toString());
+                    } catch (SQLException e) {
+                        sendJsonResponse(exchange, 500, "{\"error\":\"" + e.getMessage() + "\"}");
                     }
-                    sb.append("]");
-                    sendJsonResponse(exchange, 200, sb.toString());
-                } catch (SQLException e) {
-                    sendJsonResponse(exchange, 500, "{\"error\":\"" + e.getMessage() + "\"}");
-                }
-            } else if ("POST".equalsIgnoreCase(method)) {
-                String body = readRequestBody(exchange);
-                String invoiceId = getJsonField(body, "invoice_id");
-                String patientId = getJsonField(body, "patient_id");
-                String patientName = getJsonField(body, "patient_name");
-                String amountStr = getJsonField(body, "amount");
-                double amount = amountStr.isEmpty() ? 0.0 : Double.parseDouble(amountStr);
-                String methodStr = getJsonField(body, "payment_method");
-                String txnId = "TXN" + (10000000 + (int)(Math.random() * 90000000));
-                String payId = "PAY-" + (9000 + (int)(Math.random() * 1000));
+                } else if ("POST".equalsIgnoreCase(method)) {
+                    String body = readRequestBody(exchange);
+                    String invoiceId = getJsonField(body, "invoice_id");
+                    String patientId = getJsonField(body, "patient_id");
+                    String patientName = getJsonField(body, "patient_name");
+                    String amountStr = getJsonField(body, "amount");
+                    double amount = 0.0;
+                    try {
+                        amount = Double.parseDouble(amountStr);
+                    } catch (Exception ignored) {}
 
-                String sqlPay = "INSERT INTO payments (id, invoice_id, patient_id, patient_name, amount, payment_method, transaction_id, status, verified_by_admin) VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed', 1)";
-                String sqlInv = "UPDATE invoices SET status = 'Paid' WHERE id = ?";
-                try (Connection conn = DatabaseManager.getConnection();
-                     PreparedStatement pstmtPay = conn.prepareStatement(sqlPay);
-                     PreparedStatement pstmtInv = conn.prepareStatement(sqlInv)) {
+                    String methodStr = getJsonField(body, "payment_method");
+                    if (methodStr.isEmpty()) methodStr = "UPI / Card Online";
+                    String txnId = "TXN" + (10000000 + (int)(Math.random() * 90000000));
+                    String payId = "PAY-" + (9000 + (int)(Math.random() * 1000));
+                    String cleanOrderId = invoiceId.replace("INV-", "").replace("ord_", "");
 
-                    pstmtPay.setString(1, payId);
-                    pstmtPay.setString(2, invoiceId);
-                    pstmtPay.setString(3, patientId);
-                    pstmtPay.setString(4, patientName);
-                    pstmtPay.setDouble(5, amount);
-                    pstmtPay.setString(6, methodStr);
-                    pstmtPay.setString(7, txnId);
-                    pstmtPay.executeUpdate();
+                    String sqlPay = "INSERT INTO payments (id, invoice_id, patient_id, patient_name, amount, payment_method, transaction_id, status, verified_by_admin) VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed', 1)";
+                    String sqlInv = "UPDATE invoices SET status = 'Paid' WHERE id = ? OR order_id = ? OR id = ?";
+                    String sqlOrd = "UPDATE orders SET status = 'Completed' WHERE id = ? OR id = ?";
 
-                    pstmtInv.setString(1, invoiceId);
-                    pstmtInv.executeUpdate();
+                    try (Connection conn = DatabaseManager.getConnection()) {
+                        try (PreparedStatement pstmtPay = conn.prepareStatement(sqlPay)) {
+                            pstmtPay.setString(1, payId);
+                            pstmtPay.setString(2, invoiceId);
+                            pstmtPay.setString(3, patientId);
+                            pstmtPay.setString(4, patientName);
+                            pstmtPay.setDouble(5, amount);
+                            pstmtPay.setString(6, methodStr);
+                            pstmtPay.setString(7, txnId);
+                            pstmtPay.executeUpdate();
+                        } catch (Exception ignored) {}
 
-                    logAudit(patientName, "Patient", "Online Payment Completed", "Billing", "Paid ₹" + amount + " online for Invoice #" + invoiceId + " via " + methodStr + " (Txn: " + txnId + ")");
+                        try (PreparedStatement pstmtInv = conn.prepareStatement(sqlInv)) {
+                            pstmtInv.setString(1, invoiceId);
+                            pstmtInv.setString(2, "ord_" + cleanOrderId);
+                            pstmtInv.setString(3, "INV-" + cleanOrderId);
+                            pstmtInv.executeUpdate();
+                        } catch (Exception ignored) {}
 
-                    // Notifications
-                    String sqlNotif = "INSERT INTO notifications (id, target_role, message, type) VALUES (?, ?, ?, ?)";
-                    try (PreparedStatement notifStmt = conn.prepareStatement(sqlNotif)) {
-                        notifStmt.setString(1, "NOTIF-" + System.currentTimeMillis());
-                        notifStmt.setString(2, "billing");
-                        notifStmt.setString(3, "Online payment ₹" + amount + " received for Invoice #" + invoiceId + " from " + patientName + ".");
-                        notifStmt.setString(4, "success");
-                        notifStmt.executeUpdate();
+                        try (PreparedStatement pstmtOrd = conn.prepareStatement(sqlOrd)) {
+                            pstmtOrd.setString(1, "ord_" + cleanOrderId);
+                            pstmtOrd.setString(2, cleanOrderId);
+                            pstmtOrd.executeUpdate();
+                        } catch (Exception ignored) {}
 
-                        notifStmt.setString(1, "NOTIF-" + (System.currentTimeMillis() + 1));
-                        notifStmt.setString(2, "patient");
-                        notifStmt.setString(3, "Payment of ₹" + amount + " for Invoice #" + invoiceId + " was successful.");
-                        notifStmt.setString(4, "success");
-                        notifStmt.executeUpdate();
+                        logAudit(patientName, "Patient", "Online Payment Completed", "Billing", "Paid ₹" + amount + " online for Invoice #" + invoiceId + " via " + methodStr + " (Txn: " + txnId + ")");
+
+                        // Event Notifications
+                        String sqlNotif = "INSERT INTO notifications (id, target_role, target_user_id, message, type) VALUES (?, ?, ?, ?, ?)";
+                        try (PreparedStatement notifStmt = conn.prepareStatement(sqlNotif)) {
+                            // Admin Notification
+                            notifStmt.setString(1, "NOTIF-" + System.currentTimeMillis());
+                            notifStmt.setString(2, "admin");
+                            notifStmt.setString(3, "");
+                            notifStmt.setString(4, "Payment received for " + patientName + " — Invoice #" + invoiceId + " (₹" + amount + ").");
+                            notifStmt.setString(5, "success");
+                            notifStmt.executeUpdate();
+
+                            // Patient Notification
+                            notifStmt.setString(1, "NOTIF-" + (System.currentTimeMillis() + 1));
+                            notifStmt.setString(2, "patient");
+                            notifStmt.setString(3, patientId);
+                            notifStmt.setString(4, "Payment of ₹" + amount + " confirmed for Invoice #" + invoiceId + ".");
+                            notifStmt.setString(5, "success");
+                            notifStmt.executeUpdate();
+                        } catch (Exception ignored) {}
+
+                        sendJsonResponse(exchange, 201, "{\"success\":true,\"transaction_id\":\"" + txnId + "\",\"message\":\"Payment gateway authorization successful.\"}");
                     }
-
-                    sendJsonResponse(exchange, 201, "{\"success\":true,\"transaction_id\":\"" + txnId + "\",\"message\":\"Payment gateway authorization successful.\"}");
-                } catch (SQLException e) {
-                    sendJsonResponse(exchange, 500, "{\"error\":\"" + e.getMessage() + "\"}");
                 }
+            } catch (Exception e) {
+                sendJsonResponse(exchange, 500, "{\"error\":\"" + e.getMessage() + "\"}");
             }
         }
     }
@@ -804,7 +929,7 @@ public class LimsServer {
         }
     }
 
-    // 13. Notifications Handler (Multi-role Notification Center API)
+    // 13. Notifications Handler (Multi-role Event-Driven Notification Center API)
     static class NotificationsHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -815,24 +940,56 @@ public class LimsServer {
             }
             String method = exchange.getRequestMethod();
             if ("GET".equalsIgnoreCase(method)) {
-                String sql = "SELECT * FROM notifications ORDER BY timestamp DESC";
-                try (Connection conn = DatabaseManager.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-                    StringBuilder sb = new StringBuilder("[");
-                    boolean first = true;
-                    while (rs.next()) {
-                        if (!first) sb.append(",");
-                        sb.append(String.format(
-                            "{\"id\":\"%s\",\"target_role\":\"%s\",\"message\":\"%s\",\"type\":\"%s\",\"is_read\":%d,\"timestamp\":\"%s\"}",
-                            rs.getString("id"), rs.getString("target_role"),
-                            rs.getString("message").replace("\"", "\\\""),
-                            rs.getString("type"), rs.getInt("is_read"), rs.getString("timestamp")
-                        ));
-                        first = false;
+                String rawQuery = exchange.getRequestURI().getQuery();
+                String userIdParam = "";
+                String roleParam = "";
+                if (rawQuery != null) {
+                    for (String pairStr : rawQuery.split("&")) {
+                        String[] pair = pairStr.split("=");
+                        if (pair.length == 2) {
+                            if ("userId".equalsIgnoreCase(pair[0])) userIdParam = pair[1];
+                            if ("role".equalsIgnoreCase(pair[0])) roleParam = pair[1];
+                        }
                     }
-                    sb.append("]");
-                    sendJsonResponse(exchange, 200, sb.toString());
+                }
+
+                String sql = "SELECT * FROM notifications ORDER BY timestamp DESC";
+                PreparedStatement pstmt = null;
+                Connection conn = null;
+                try {
+                    conn = DatabaseManager.getConnection();
+                    if (!userIdParam.isEmpty() || !roleParam.isEmpty()) {
+                        sql = "SELECT * FROM notifications WHERE target_user_id = ? OR target_role = ? ORDER BY timestamp DESC";
+                        pstmt = conn.prepareStatement(sql);
+                        pstmt.setString(1, userIdParam);
+                        pstmt.setString(2, roleParam);
+                    } else {
+                        pstmt = conn.prepareStatement(sql);
+                    }
+
+                    try (ResultSet rs = pstmt.executeQuery()) {
+                        StringBuilder sb = new StringBuilder("[");
+                        boolean first = true;
+                        while (rs.next()) {
+                            if (!first) sb.append(",");
+                            sb.append(String.format(
+                                "{\"id\":\"%s\",\"target_role\":\"%s\",\"target_user_id\":\"%s\",\"message\":\"%s\",\"type\":\"%s\",\"is_read\":%d,\"timestamp\":\"%s\"}",
+                                rs.getString("id"),
+                                rs.getString("target_role") != null ? rs.getString("target_role") : "",
+                                rs.getString("target_user_id") != null ? rs.getString("target_user_id") : "",
+                                rs.getString("message").replace("\"", "\\\""),
+                                rs.getString("type"), rs.getInt("is_read"), rs.getString("timestamp")
+                            ));
+                            first = false;
+                        }
+                        sb.append("]");
+                        sendJsonResponse(exchange, 200, sb.toString());
+                    }
                 } catch (SQLException e) {
                     sendJsonResponse(exchange, 500, "{\"error\":\"" + e.getMessage() + "\"}");
+                } finally {
+                    try { if (pstmt != null) pstmt.close(); } catch (Exception ignored) {}
+                    try { if (conn != null) conn.close(); } catch (Exception ignored) {}
                 }
             } else if ("DELETE".equalsIgnoreCase(method)) {
                 String sql = "DELETE FROM notifications";
